@@ -1,0 +1,308 @@
+#!/bin/bash
+#############################################
+# Sing-box Management Script (sbctl)
+# Author: Cascade AI
+# Version: 1.0.0
+# Date: 2025-05-31
+#############################################
+
+# Color definitions
+RED="\033[31m"
+GREEN="\033[32m"
+YELLOW="\033[33m"
+BLUE="\033[36m"
+PLAIN="\033[0m"
+
+# Configuration paths
+SING_BOX_DIR="/usr/local/sing-box"
+CONFIG_DIR="/etc/sing-box"
+LOG_DIR="/var/log/sing-box"
+SUBSCRIPTION_DIR="${CONFIG_DIR}/subscriptions"
+BACKUP_DIR="${CONFIG_DIR}/backups"
+SERVICE_NAME="sing-box"
+SCRIPT_PATH="/usr/bin/sbctl"
+
+# Check if user is root
+check_root() {
+    if [[ $EUID -ne 0 ]]; then
+        echo -e "${RED}Error: This script must be run as root!${PLAIN}"
+        exit 1
+    fi
+}
+
+# Check if systemd is available
+check_systemd() {
+    if ! command -v systemctl >/dev/null 2>&1; then
+        echo -e "${RED}Error: This script requires systemd to manage services!${PLAIN}"
+        exit 1
+    fi
+}
+
+# Display help message
+show_help() {
+    echo -e "${BLUE}Sing-box Control Script (sbctl)${PLAIN}"
+    echo -e "${YELLOW}Usage:${PLAIN}"
+    echo -e "  sbctl [command]"
+    echo -e ""
+    echo -e "${YELLOW}Available Commands:${PLAIN}"
+    echo -e "  ${GREEN}install${PLAIN}       Install or update sing-box"
+    echo -e "  ${GREEN}uninstall${PLAIN}     Uninstall sing-box"
+    echo -e "  ${GREEN}start${PLAIN}         Start sing-box service"
+    echo -e "  ${GREEN}stop${PLAIN}          Stop sing-box service"
+    echo -e "  ${GREEN}restart${PLAIN}       Restart sing-box service"
+    echo -e "  ${GREEN}status${PLAIN}        Check sing-box service status"
+    echo -e "  ${GREEN}reload${PLAIN}        Reload sing-box configuration"
+    echo -e "  ${GREEN}log${PLAIN}           View sing-box logs"
+    echo -e "  ${GREEN}check${PLAIN}         Check configuration file syntax"
+    echo -e "  ${GREEN}update${PLAIN}        Update sing-box to latest version"
+    echo -e "  ${GREEN}subscribe${PLAIN}     Manage clash subscriptions"
+    echo -e "  ${GREEN}backup${PLAIN}        Backup configuration"
+    echo -e "  ${GREEN}restore${PLAIN}       Restore configuration from backup"
+    echo -e "  ${GREEN}test${PLAIN}          Run network diagnostics"
+    echo -e "  ${GREEN}version${PLAIN}       Show version information"
+    echo -e ""
+    echo -e "${YELLOW}Examples:${PLAIN}"
+    echo -e "  sbctl install                 # Install sing-box"
+    echo -e "  sbctl subscribe add URL       # Add a subscription URL"
+    echo -e "  sbctl subscribe update        # Update all subscriptions"
+    echo -e ""
+}
+
+# Show sing-box status
+show_status() {
+    echo -e "${BLUE}Checking sing-box status...${PLAIN}"
+    systemctl status ${SERVICE_NAME} --no-pager
+}
+
+# Start sing-box service
+start_service() {
+    echo -e "${BLUE}Starting sing-box service...${PLAIN}"
+    systemctl start ${SERVICE_NAME}
+    if [[ $? -eq 0 ]]; then
+        echo -e "${GREEN}Sing-box service started successfully!${PLAIN}"
+    else
+        echo -e "${RED}Failed to start sing-box service!${PLAIN}"
+        exit 1
+    fi
+}
+
+# Stop sing-box service
+stop_service() {
+    echo -e "${BLUE}Stopping sing-box service...${PLAIN}"
+    systemctl stop ${SERVICE_NAME}
+    if [[ $? -eq 0 ]]; then
+        echo -e "${GREEN}Sing-box service stopped successfully!${PLAIN}"
+    else
+        echo -e "${RED}Failed to stop sing-box service!${PLAIN}"
+        exit 1
+    fi
+}
+
+# Restart sing-box service
+restart_service() {
+    echo -e "${BLUE}Restarting sing-box service...${PLAIN}"
+    systemctl restart ${SERVICE_NAME}
+    if [[ $? -eq 0 ]]; then
+        echo -e "${GREEN}Sing-box service restarted successfully!${PLAIN}"
+    else
+        echo -e "${RED}Failed to restart sing-box service!${PLAIN}"
+        exit 1
+    fi
+}
+
+# Reload sing-box configuration
+reload_config() {
+    echo -e "${BLUE}Checking configuration syntax...${PLAIN}"
+    ${SING_BOX_DIR}/sing-box check -C ${CONFIG_DIR}/config.json
+    if [[ $? -ne 0 ]]; then
+        echo -e "${RED}Configuration syntax error! Aborting reload.${PLAIN}"
+        exit 1
+    fi
+    
+    echo -e "${BLUE}Reloading sing-box configuration...${PLAIN}"
+    systemctl reload ${SERVICE_NAME}
+    if [[ $? -eq 0 ]]; then
+        echo -e "${GREEN}Sing-box configuration reloaded successfully!${PLAIN}"
+    else
+        echo -e "${RED}Failed to reload sing-box configuration!${PLAIN}"
+        exit 1
+    fi
+}
+
+# View sing-box logs
+view_logs() {
+    echo -e "${BLUE}Displaying sing-box logs...${PLAIN}"
+    journalctl -u ${SERVICE_NAME} -f --no-pager
+}
+
+# Check configuration syntax
+check_config() {
+    echo -e "${BLUE}Checking configuration syntax...${PLAIN}"
+    ${SING_BOX_DIR}/sing-box check -C ${CONFIG_DIR}/config.json
+    if [[ $? -eq 0 ]]; then
+        echo -e "${GREEN}Configuration syntax is correct!${PLAIN}"
+    else
+        echo -e "${RED}Configuration syntax error!${PLAIN}"
+        exit 1
+    fi
+}
+
+# Show version information
+show_version() {
+    if [[ -f "${SING_BOX_DIR}/sing-box" ]]; then
+        echo -e "${BLUE}Sing-box version:${PLAIN}"
+        ${SING_BOX_DIR}/sing-box version
+        echo -e "${BLUE}Sbctl version: 1.0.0${PLAIN}"
+    else
+        echo -e "${RED}Sing-box is not installed!${PLAIN}"
+        exit 1
+    fi
+}
+
+# Main function
+main() {
+    check_root
+    check_systemd
+    
+    if [[ $# -eq 0 ]]; then
+        # Display interactive menu if no arguments provided
+        show_menu
+    else
+        case "$1" in
+            install)
+                bash <(curl -fsSL https://raw.githubusercontent.com/yourusername/sing-box-script/main/install.sh)
+                ;;
+            uninstall)
+                bash <(curl -fsSL https://raw.githubusercontent.com/yourusername/sing-box-script/main/install.sh) uninstall
+                ;;
+            start)
+                start_service
+                ;;
+            stop)
+                stop_service
+                ;;
+            restart)
+                restart_service
+                ;;
+            status)
+                show_status
+                ;;
+            reload)
+                reload_config
+                ;;
+            log)
+                view_logs
+                ;;
+            check)
+                check_config
+                ;;
+            update)
+                bash <(curl -fsSL https://raw.githubusercontent.com/yourusername/sing-box-script/main/install.sh) update
+                ;;
+            subscribe)
+                manage_subscription "$@"
+                ;;
+            backup)
+                backup_config
+                ;;
+            restore)
+                restore_config "$2"
+                ;;
+            test)
+                run_diagnostics
+                ;;
+            version)
+                show_version
+                ;;
+            -h|--help|help)
+                show_help
+                ;;
+            *)
+                echo -e "${RED}Unknown command: $1${PLAIN}"
+                show_help
+                exit 1
+                ;;
+        esac
+    fi
+}
+
+# Interactive menu
+show_menu() {
+    clear
+    echo -e "${BLUE}┌─────────────────────────────────────────┐${PLAIN}"
+    echo -e "${BLUE}│        Sing-box Management Panel        │${PLAIN}"
+    echo -e "${BLUE}├─────────────────────────────────────────┤${PLAIN}"
+    echo -e "${BLUE}│${PLAIN} ${GREEN}1.${PLAIN} Install/Update sing-box               ${BLUE}│${PLAIN}"
+    echo -e "${BLUE}│${PLAIN} ${GREEN}2.${PLAIN} Uninstall sing-box                   ${BLUE}│${PLAIN}"
+    echo -e "${BLUE}│${PLAIN} ${GREEN}3.${PLAIN} Start sing-box                       ${BLUE}│${PLAIN}"
+    echo -e "${BLUE}│${PLAIN} ${GREEN}4.${PLAIN} Stop sing-box                        ${BLUE}│${PLAIN}"
+    echo -e "${BLUE}│${PLAIN} ${GREEN}5.${PLAIN} Restart sing-box                     ${BLUE}│${PLAIN}"
+    echo -e "${BLUE}│${PLAIN} ${GREEN}6.${PLAIN} Check sing-box status                ${BLUE}│${PLAIN}"
+    echo -e "${BLUE}│${PLAIN} ${GREEN}7.${PLAIN} View sing-box logs                   ${BLUE}│${PLAIN}"
+    echo -e "${BLUE}│${PLAIN} ${GREEN}8.${PLAIN} Reload sing-box configuration        ${BLUE}│${PLAIN}"
+    echo -e "${BLUE}│${PLAIN} ${GREEN}9.${PLAIN} Manage subscriptions                 ${BLUE}│${PLAIN}"
+    echo -e "${BLUE}│${PLAIN} ${GREEN}10.${PLAIN} Backup/Restore configuration        ${BLUE}│${PLAIN}"
+    echo -e "${BLUE}│${PLAIN} ${GREEN}11.${PLAIN} Network diagnostics                 ${BLUE}│${PLAIN}"
+    echo -e "${BLUE}│${PLAIN} ${GREEN}0.${PLAIN} Exit                                ${BLUE}│${PLAIN}"
+    echo -e "${BLUE}└─────────────────────────────────────────┘${PLAIN}"
+    echo ""
+    read -p "Please enter your choice [0-11]: " choice
+    
+    case "${choice}" in
+        1)
+            bash <(curl -fsSL https://raw.githubusercontent.com/yourusername/sing-box-script/main/install.sh)
+            ;;
+        2)
+            bash <(curl -fsSL https://raw.githubusercontent.com/yourusername/sing-box-script/main/install.sh) uninstall
+            ;;
+        3)
+            start_service
+            ;;
+        4)
+            stop_service
+            ;;
+        5)
+            restart_service
+            ;;
+        6)
+            show_status
+            ;;
+        7)
+            view_logs
+            ;;
+        8)
+            reload_config
+            ;;
+        9)
+            show_subscription_menu
+            ;;
+        10)
+            show_backup_menu
+            ;;
+        11)
+            run_diagnostics
+            ;;
+        0)
+            echo -e "${GREEN}Exiting...${PLAIN}"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Invalid choice. Please try again.${PLAIN}"
+            sleep 2
+            show_menu
+            ;;
+    esac
+    
+    echo ""
+    read -p "Press Enter to return to the main menu..." dummy
+    show_menu
+}
+
+# Subscription management functions will be implemented here
+
+# Backup and restore functions will be implemented here
+
+# Network diagnostics functions will be implemented here
+
+# Execute main function
+main "$@"
