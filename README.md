@@ -21,14 +21,14 @@
 ### 一键安装
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/yourusername/sing-box-script/main/install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/randyhong/sing-box-linux/main/install.sh)"
 ```
 
 ### 手动安装
 
 ```bash
-git clone https://github.com/yourusername/sing-box-script.git
-cd sing-box-script
+git clone https://github.com/randyhong/sing-box-linux.git
+cd sing-box-linux
 chmod +x install.sh
 ./install.sh
 ```
